@@ -82,7 +82,7 @@ function openDetail(id){
   const map = lang==="en" ? (e.map||p.map) : p.map;
   const misuse = lang==="en" ? (e.misuse||p.misuse) : p.misuse;
   const prompt = lang==="en" ? (e.prompt||p.prompt) : p.prompt;
-  const uses = lang==="en" ? p.use.map(x=>translateUse(x)) : p.use;
+  const uses = lang==="en" ? (e.use || p.use.map(x=>translateUse(x))) : p.use;
   $("#modal").innerHTML=`
     <div class="modal-head">
       <div><div class="en">${sub}</div><h3>${name}</h3></div>
@@ -135,15 +135,7 @@ function escapeHtml(s){return s.replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;","
 function renderDecision(){
   const t = uiText[lang];
   $("#decisionGrid").innerHTML = decisionData.map((d,i)=>{
-    const view = lang==="en" ? {
-      problem:decisionEN[i][0],
-      question:decisionEN[i][1],
-      actions:decisionEN[i][2]
-    } : {
-      problem:d.problem,
-      question:d.question,
-      actions:d.actions
-    };
+    const view = lang==="en" ? {problem:decisionEN[i][0],question:decisionEN[i][1],actions:decisionEN[i][2]} : {problem:d.problem,question:d.question,actions:d.actions};
     const principleButtons = d.principles.map(id=>{
       const p = principles.find(x=>x.id===id);
       const e = lang==="en" ? (principleEN[id]||{}) : {};
