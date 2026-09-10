@@ -1,0 +1,209 @@
+/* v1.2 card-oriented browsing layout */
+
+/* Principles: dense 3-column knowledge cards */
+.principle-list{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:14px;
+}
+.principle-row{
+  min-height:245px;
+  border:1px solid var(--line);
+  background:var(--panel);
+  border-radius:18px;
+  padding:18px;
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  gap:12px;
+  transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease,background .16s ease;
+}
+.principle-row:hover{
+  transform:translateY(-3px);
+  border-color:var(--line-strong);
+  box-shadow:var(--shadow);
+}
+.principle-row>a:first-child{display:block}
+.principle-row .en{
+  font-size:10px;
+  letter-spacing:.02em;
+  color:var(--muted);
+  margin-bottom:5px;
+}
+.principle-row h3{
+  font-size:19px;
+  line-height:1.25;
+  letter-spacing:-.025em;
+  margin:0;
+}
+.principle-row>a:nth-child(2){
+  flex:1;
+  display:block;
+}
+.principle-row p{
+  display:-webkit-box;
+  -webkit-line-clamp:4;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+  font-size:12px;
+  line-height:1.7;
+  color:var(--muted);
+  margin:0;
+}
+.row-tags{
+  margin-top:auto;
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  gap:6px;
+  flex-wrap:wrap;
+  padding-top:4px;
+}
+.row-tags .star{
+  margin-left:auto;
+}
+
+/* Decisions: two-column, vertical problem -> judgment -> principles -> actions */
+.decision-list{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:16px;
+}
+.decision-card{
+  min-height:360px;
+  padding:22px;
+  display:flex;
+  flex-direction:column;
+  gap:18px;
+  border-radius:20px;
+  transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
+}
+.decision-card:hover{
+  transform:translateY(-3px);
+  border-color:var(--line-strong);
+  box-shadow:var(--shadow);
+}
+.decision-card>div{
+  min-width:0;
+}
+.decision-card>div+div{
+  padding-top:15px;
+  border-top:1px solid var(--line);
+}
+.decision-label{
+  font-size:9px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--muted);
+  margin-bottom:8px;
+}
+.decision-problem{
+  font-size:18px;
+  line-height:1.45;
+  letter-spacing:-.02em;
+}
+.decision-question{
+  font-size:13px;
+  line-height:1.75;
+  color:var(--muted);
+}
+.principle-pills{
+  margin-top:12px;
+  gap:7px;
+}
+.principle-pill{
+  padding:6px 9px;
+  font-size:10px;
+  background:var(--panel-2);
+}
+.action-list{
+  margin:0;
+  padding-left:19px;
+}
+.action-list li{
+  font-size:12px;
+  line-height:1.7;
+  margin:4px 0;
+}
+
+/* Relations: compact 3-column relationship cards */
+.relation-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:14px;
+}
+.relation-card{
+  min-height:230px;
+  padding:20px;
+  border-radius:18px;
+  display:flex;
+  flex-direction:column;
+  transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
+}
+.relation-card:hover{
+  transform:translateY(-3px);
+  border-color:var(--line-strong);
+  box-shadow:var(--shadow);
+}
+.relation-card .en{
+  font-size:10px;
+  color:var(--muted);
+  margin-bottom:5px;
+}
+.relation-card h3{
+  font-size:19px;
+  line-height:1.3;
+  letter-spacing:-.02em;
+  margin:0 0 10px;
+}
+.relation-card p{
+  font-size:12px;
+  line-height:1.7;
+  color:var(--muted);
+  margin:0;
+}
+.relation-line{
+  margin-top:auto;
+  padding-top:16px;
+  border-top:1px solid var(--line);
+  display:flex;
+  align-items:center;
+  gap:7px;
+  flex-wrap:wrap;
+}
+.relation-arrow{
+  width:100%;
+  font-size:9px;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--muted);
+  margin-bottom:2px;
+}
+
+/* Make cards feel more like a knowledge handbook than an admin table */
+.principle-row,
+.decision-card,
+.relation-card{
+  background:linear-gradient(180deg,var(--panel),var(--panel-2));
+}
+.tag{
+  border:1px solid color-mix(in srgb,var(--line) 78%,transparent);
+}
+
+@media(max-width:1180px){
+  .principle-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .relation-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+@media(max-width:900px){
+  .decision-list{grid-template-columns:1fr}
+}
+
+@media(max-width:760px){
+  .principle-list,
+  .decision-list,
+  .relation-grid{grid-template-columns:1fr}
+  .principle-row,
+  .decision-card,
+  .relation-card{min-height:auto}
+}
