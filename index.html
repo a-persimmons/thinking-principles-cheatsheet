@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LLM / Agent Engineering 思想原则速查表</title>
+<link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+<div class="wrap">
+  <section class="hero">
+    <div>
+      <div class="eyebrow" id="eyebrow">Thinking Principles × Agent Engineering</div>
+      <h1 id="mainTitle">思想原则<br>工程速查表</h1>
+      <p class="subtitle" id="subtitle">不是背哲学名词，而是在设计 Prompt、Context、Tool、Harness、Loop、Eval 时，快速找到一个合适的“思考框架”。</p>
+    </div>
+    <div>
+      <div class="hero-note" id="heroNote">使用方式：优先从“我现在遇到什么问题？”进入；也可以直接搜索原则、场景或关键词。卡片中的工程映射是现代工程类比，不等同于原思想的完整哲学含义。</div>
+      <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end">
+        <button class="ghost" id="themeToggle" aria-label="切换主题">◐ 主题</button>
+        <button class="ghost" id="langToggle" aria-label="切换语言">EN</button>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="toolbar"><div class="toolbar-inner"><div class="search-row"><input id="search" class="search" placeholder="搜索：幻觉 / Prompt 太长 / 根因分析 / RAG / 权限 / 证据 / 循环……" /><button id="favOnly" class="ghost">☆ 收藏</button></div><div class="filters" id="categoryFilters"></div><div class="filters" id="layerFilters"></div></div></div>
+<main class="wrap">
+  <section class="section"><div class="section-head"><div><h2 id="scenarioTitle">我现在遇到什么问题？</h2><div class="section-desc" id="scenarioDesc">从工程症状反查思想原则</div></div></div><div class="scenarios" id="scenarios"></div></section>
+  <section class="section"><div class="section-head"><div><h2 id="decisionTitle">从问题走到动作</h2><div class="section-desc" id="decisionDesc">工程问题 → 判断问题 → 思想原则 → 可执行动作</div></div></div><div class="decision-grid" id="decisionGrid"></div></section>
+  <div class="meta-row"><div class="result-count" id="resultCount"></div><button class="ghost" id="reset">清空筛选</button></div>
+  <section class="cards" id="cards"></section>
+  <div class="footer" id="footerText">v0.3 · 目标：把哲学、逻辑学、方法论与 LLM / Agent Engineering 建立可检索映射。<br>原则应通过实际 Eval、失败案例和工程实验验证，而不是把哲学名言当作新的“Prompt 咒语”。</div>
+</main>
+<dialog id="dialog"><div class="modal" id="modal"></div></dialog>
+<script src="./principles.js"></script>
+<script src="./decisions.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>
