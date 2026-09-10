@@ -1,182 +1,287 @@
-const categories = ["全部",...new Set(principles.map(x=>x.category))];
-const layers = ["全部","Prompt","Context","Tool","Harness","Loop","Eval"];
-let state = {category:"全部", layer:"全部", q:"", favOnly:false, scenarioIds:null};
-let lang = localStorage.getItem("principle-lang") || "zh";
-let theme = localStorage.getItem("principle-theme") || (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-document.documentElement.dataset.theme = theme;
-const favs = new Set(JSON.parse(localStorage.getItem("principle-favs") || "[]"));
-
-const $ = s => document.querySelector(s);
-
-function renderFilters(){
-  $("#categoryFilters").innerHTML = categories.map(c=>`<button class="chip ${state.category===c?'active':''}" data-cat="${c}">${lang==="en"?(categoryEN[c]||c):c}</button>`).join("");
-  $("#layerFilters").innerHTML = layers.map(c=>`<button class="chip ${state.layer===c?'active':''}" data-layer="${c}">${c==="全部"?(lang==="en"?uiText.en.allLayer:uiText.zh.allLayer):c}</button>`).join("");
-  document.querySelectorAll("[data-cat]").forEach(b=>b.onclick=()=>{state.category=b.dataset.cat;state.scenarioIds=null;render()});
-  document.querySelectorAll("[data-layer]").forEach(b=>b.onclick=()=>{state.layer=b.dataset.layer;state.scenarioIds=null;render()});
-}
-
-function renderScenarios(){
-  $("#scenarios").innerHTML=scenarioData.map((s,i)=>{
-    const view = lang==="en" ? scenarioEN[i] : s;
-    return `<div class="scenario" data-scenario="${i}">
-      <strong>${view[0]}</strong><span>${view[1]}</span>
-    </div>`;
-  }).join("");
-  document.querySelectorAll("[data-scenario]").forEach(el=>el.onclick=()=>{
-    const s=scenarioData[+el.dataset.scenario];
-    state.scenarioIds=s[2]; state.q=""; state.category="全部"; state.layer="全部";
-    $("#search").value="";
-    render();
-    window.scrollTo({top:document.querySelector(".meta-row").offsetTop-130,behavior:"smooth"});
-  });
-}
-
-function match(p){
-  if(state.favOnly && !favs.has(p.id)) return false;
-  if(state.category!=="全部" && p.category!==state.category) return false;
-  if(state.layer!=="全部" && !p.layers.includes(state.layer)) return false;
-  if(state.scenarioIds && !state.scenarioIds.includes(p.id)) return false;
-  const q=state.q.trim().toLowerCase();
-  if(!q) return true;
-  return [p.name,p.en,p.category,p.core,p.map,p.misuse,...p.layers,...p.use].join(" ").toLowerCase().includes(q);
-}
-
-function renderCards(){
-  const t = uiText[lang];
-  const data=principles.filter(match);
-  $("#resultCount").textContent=`${t.showing} ${data.length} / ${principles.length} ${t.items}${state.scenarioIds?t.scenarioRec:""}`;
-  $("#cards").innerHTML=data.length ? data.map(p=>{
-    const e = lang==="en" ? (principleEN[p.id]||{}) : {};
-    const name = lang==="en" ? (e.name||p.en) : p.name;
-    const sub = lang==="en" ? p.name : p.en;
-    const core = lang==="en" ? (e.core||p.core) : p.core;
-    const map = lang==="en" ? (e.map||p.map) : p.map;
-    return `
-    <article class="card">
-      <div class="card-top">
-        <div><div class="en">${sub}</div><h3>${name}</h3></div>
-        <button class="fav ${favs.has(p.id)?'on':''}" data-fav="${p.id}" title="${lang==="en"?"Favorite":"收藏"}">${favs.has(p.id)?"★":"☆"}</button>
-      </div>
-      <div class="quote">${core}</div>
-      <div class="mapping">${map}</div>
-      <div class="tags">
-        <span class="tag">${lang==="en"?(categoryEN[p.category]||p.category):p.category}</span>${p.layers.map(x=>`<span class="tag">${x}</span>`).join("")}
-      </div>
-      <button class="more" data-open="${p.id}">${t.open}</button>
-    </article>`;
-  }).join("") : `<div class="empty">${t.empty}</div>`;
-  document.querySelectorAll("[data-fav]").forEach(b=>b.onclick=()=>{
-    const id=b.dataset.fav; favs.has(id)?favs.delete(id):favs.add(id);
-    localStorage.setItem("principle-favs",JSON.stringify([...favs])); renderCards();
-  });
-  document.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>openDetail(b.dataset.open));
-}
-
-function openDetail(id){
-  const p=principles.find(x=>x.id===id);
-  const e = lang==="en" ? (principleEN[p.id]||{}) : {};
-  const t = uiText[lang];
-  const name = lang==="en" ? (e.name||p.en) : p.name;
-  const sub = lang==="en" ? p.name : p.en;
-  const core = lang==="en" ? (e.core||p.core) : p.core;
-  const map = lang==="en" ? (e.map||p.map) : p.map;
-  const misuse = lang==="en" ? (e.misuse||p.misuse) : p.misuse;
-  const prompt = lang==="en" ? (e.prompt||p.prompt) : p.prompt;
-  const uses = lang==="en" ? (e.use || p.use.map(x=>translateUse(x))) : p.use;
-  $("#modal").innerHTML=`
-    <div class="modal-head">
-      <div><div class="en">${sub}</div><h3>${name}</h3></div>
-      <button class="close" id="close">×</button>
-    </div>
-    <div class="quote">${core}</div>
-    <div class="mapping">${map}</div>
-    <div class="detail-grid">
-      <div class="detail-block"><h4>${t.use}</h4><ul>${uses.map(x=>`<li>${x}</li>`).join("")}</ul></div>
-      <div class="detail-block"><h4>${t.misuse}</h4><p>${misuse}</p></div>
-    </div>
-    <div class="detail-block" style="margin-top:14px"><h4>${t.prompt}</h4><pre>${escapeHtml(prompt)}</pre></div>`;
-  $("#dialog").showModal();
-  $("#close").onclick=()=>$("#dialog").close();
-}
-function translateUse(s){
-  const m = {
-    "Prompt 越写越长":"Growing prompts","Multi-Agent 过度设计":"Over-engineered multi-agent systems","上下文堆积":"Context bloat","工作流步骤过多":"Too many workflow steps",
-    "模型不按要求输出":"Instruction-following failures","Tool Calling 失败":"Tool-calling failures","线上行为异常":"Production anomalies","Agent Debug":"Agent debugging",
-    "模型幻觉":"Hallucination","事实问答":"Fact QA","根因分析":"Root-cause analysis","研究型 Agent":"Research agents","研究":"Research","复杂推理":"Complex reasoning","Self-Reflection":"Self-reflection",
-    "诊断 Agent":"Diagnostic agents","搜索 Agent":"Search agents","不确定性管理":"Uncertainty management","多轮调查":"Multi-step investigation",
-    "不知道 Prompt 怎么写":"Unclear prompt design","套模板无效":"Templates fail","复杂 Agent 需求":"Complex agent requirements","架构设计":"Architecture design",
-    "RAG":"RAG","摘要链":"Summary pipelines","Memory":"Memory","长上下文":"Long context","数据抽取":"Data extraction",
-    "回答冗长":"Verbose answers","跑题":"Off-topic output","表达含糊":"Ambiguous wording","RAG 噪音":"RAG noise",
-    "意图识别":"Intent recognition","语音转写":"Speech transcription","模糊输入":"Ambiguous input","客服 Agent":"Support agents",
-    "旧 Prompt 清理":"Legacy prompt cleanup","规则重构":"Rule refactoring","Guardrail 删除":"Guardrail removal","系统迁移":"System migration",
-    "Eval 设计":"Eval design","奖励模型":"Reward models","自动优化 Prompt":"Automated prompt optimization","Agent KPI":"Agent KPIs",
-    "Benchmark":"Benchmarks","自动回归测试":"Automated regression tests","Prompt 平台":"Prompt platforms","绩效指标":"Performance metrics",
-    "生产 Agent":"Production agents","流式 JSON":"Streaming JSON","故障恢复":"Failure recovery",
-    "执行型 Agent":"Action-taking agents","自动化":"Automation","文件修改":"File editing","代码 Agent":"Coding agents",
-    "MCP":"MCP","Tool 权限":"Tool permissions","企业 Agent":"Enterprise agents",
-    "事务操作":"Transactional operations","API Agent":"API agents",
-    "Prompt 优化":"Prompt optimization","Bad case 分析":"Bad-case analysis","成本优化":"Cost optimization","学习路线":"Learning roadmap",
-    "分类任务":"Classification","规则判断":"Rule-based judgment","抽象要求":"Abstract requirements","多人维护 Prompt":"Multi-owner prompts",
-    "主观评价":"Subjective evaluation","分类标准":"Classification criteria","质量 Rubric":"Quality rubric","结构化输出":"Structured output",
-    "事实核验":"Fact verification","决策支持":"Decision support",
-    "Agent 规划":"Agent planning","Prompt 过度编排":"Over-orchestrated prompts","复杂工作流":"Complex workflows","自主 Tool Use":"Autonomous tool use",
-    "Agent Runtime":"Agent runtime","规则系统":"Rule systems","多工具 Agent":"Multi-tool agents","工程架构":"Engineering architecture",
-    "上下文污染":"Context contamination","复杂系统":"Complex systems",
-    "知识缺失":"Knowledge gaps","RAG 无结果":"Empty RAG result","高风险回答":"High-risk answers",
-    "Research Agent":"Research agents","网络搜索":"Web search","竞争情报":"Competitive intelligence",
-    "知识库":"Knowledge bases","企业文档":"Enterprise documents","长期 Memory":"Long-term memory",
-    "Agent 无限循环":"Infinite agent loops","过度搜索":"Over-searching","成本失控":"Cost runaway","自主任务":"Autonomous tasks"
+const App = (() => {
+  const $ = (s, root=document) => root.querySelector(s);
+  const $$ = (s, root=document) => [...root.querySelectorAll(s)];
+  const storage = {
+    get(key, fallback){ try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } },
+    set(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
   };
-  return m[s] || s;
-}
 
-function escapeHtml(s){return s.replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+  let lang = localStorage.getItem("principle-lang") || "zh";
+  let theme = localStorage.getItem("principle-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  let filters = { q:"", category:"全部", layer:"全部", favOnly:false };
+  const favs = new Set(storage.get("principle-favs", []));
+  let recent = storage.get("principle-recent", []);
 
-function renderDecision(){
-  const t = uiText[lang];
-  $("#decisionGrid").innerHTML = decisionData.map((d,i)=>{
-    const view = lang==="en" ? {problem:decisionEN[i][0],question:decisionEN[i][1],actions:decisionEN[i][2]} : {problem:d.problem,question:d.question,actions:d.actions};
-    const principleButtons = d.principles.map(id=>{
-      const p = principles.find(x=>x.id===id);
-      const e = lang==="en" ? (principleEN[id]||{}) : {};
-      const label = lang==="en" ? (e.name||p.en) : p.name;
-      return `<button class="principle-link" data-principle="${id}">${label}</button>`;
+  const t = {
+    zh:{
+      nav:["首页","原则库","决策手册","关系图"], homeKicker:"Thinking Principles × Agent Engineering",
+      homeTitle:"思想原则<br>工程手册", homeCopy:"不是背哲学名词，而是在遇到 Prompt、Context、Tool、Harness、Loop、Eval 问题时，快速找到一个更好的判断框架。",
+      homeAsideTitle:"怎么使用",homeAside:"先从工程问题进入；如果已经知道原则名称，就直接去原则库。原则不是答案，而是帮助你提出更好的判断问题。",
+      search:"搜索原则或工程问题，例如：幻觉、RAG、权限、循环、指标……",searchHint:"按 Enter 进入原则库；也可以直接点击下面的常见问题。",
+      entries:["原则库","决策手册","关系图"],entryDesc:["浏览全部思想原则，按类别和工程层筛选。","从工程问题反查判断问题、思想原则与可执行动作。","查看原则之间的制衡、组合与互补关系。"],
+      common:"常见工程问题",recent:"最近查看",favorites:"我的收藏",viewAll:"查看全部 →",noRecent:"还没有最近查看记录。",noFav:"还没有收藏原则。",
+      principlesTitle:"原则库",principlesSub:"快速扫描、筛选和查找适合当前问题的思考框架。",allCategories:"全部类别",allLayers:"全部工程层",favoritesOnly:"仅收藏",
+      showing:"显示",items:"条原则",clear:"清空",decisionsTitle:"决策手册",decisionsSub:"工程问题 → 判断问题 → 思想原则 → 可执行动作",decisionSearch:"搜索工程问题、判断问题或动作……",
+      relationsTitle:"关系图",relationsSub:"重点不是谁对谁错，而是什么时候一个原则需要另一个原则来制衡。",related:"制衡 / 组合原则",
+      use:"适用场景",misuse:"常见误用",premise:"适用前提",failure:"何时失效 / 需要制衡",prompt:"Prompt 模式",relatedDecisions:"相关工程问题",back:"← 返回原则库",
+      empty:"没有匹配结果。",footer:"v1.0 · 内容层保持独立，浏览层重构为 Home / Principles / Decisions / Relations / Detail。原则用于辅助判断，不替代 Eval、证据与工程验证。"
+    },
+    en:{
+      nav:["Home","Principles","Decisions","Relations"],homeKicker:"Thinking Principles × Agent Engineering",
+      homeTitle:"Thinking Principles<br>Engineering Handbook",homeCopy:"A practical way to find better judgment frameworks when Prompt, Context, Tool, Harness, Loop, or Eval problems appear.",
+      homeAsideTitle:"How to use it",homeAside:"Start from an engineering problem. If you already know the principle, go straight to the library. A principle is not the answer—it helps you ask a better judgment question.",
+      search:"Search principles or engineering problems: hallucination, RAG, permissions, loop, metrics…",searchHint:"Press Enter to open the principle library, or choose a common problem below.",
+      entries:["Principles","Decision Handbook","Relations"],entryDesc:["Browse all principles by category and engineering layer.","Map engineering problems to judgment questions, principles, and executable actions.","Explore balancing and complementary relationships between principles."],
+      common:"Common engineering problems",recent:"Recently viewed",favorites:"Favorites",viewAll:"View all →",noRecent:"No recently viewed principles yet.",noFav:"No favorites yet.",
+      principlesTitle:"Principle Library",principlesSub:"Scan, filter, and find thinking frameworks for the current engineering problem.",allCategories:"All categories",allLayers:"All engineering layers",favoritesOnly:"Favorites only",
+      showing:"Showing",items:"principles",clear:"Clear",decisionsTitle:"Decision Handbook",decisionsSub:"Engineering problem → Judgment question → Thinking principles → Executable actions",decisionSearch:"Search problems, judgment questions, or actions…",
+      relationsTitle:"Relations",relationsSub:"The point is not which principle wins, but when one principle needs another to balance it.",related:"Balance / combine with",
+      use:"Use cases",misuse:"Common misuse",premise:"When it applies",failure:"When it breaks / needs balance",prompt:"Prompt pattern",relatedDecisions:"Related engineering problems",back:"← Back to principles",
+      empty:"No matching results.",footer:"v1.0 · Content remains modular while the browsing layer is organized into Home / Principles / Decisions / Relations / Detail. Principles support judgment; they do not replace evals, evidence, or engineering verification."
+    }
+  };
+
+  function L(){ return t[lang]; }
+  function pEN(p){ return principleEN[p.id] || {}; }
+  function nameOf(p){ const e=pEN(p); return lang==="en" ? (e.name||p.en) : p.name; }
+  function subNameOf(p){ return lang==="en" ? p.name : p.en; }
+  function coreOf(p){ const e=pEN(p); return lang==="en" ? (e.core||p.core) : p.core; }
+  function mapOf(p){ const e=pEN(p); return lang==="en" ? (e.map||p.map) : p.map; }
+  function useOf(p){ const e=pEN(p); return lang==="en" ? (e.use||p.use) : p.use; }
+  function misuseOf(p){ const e=pEN(p); return lang==="en" ? (e.misuse||p.misuse) : p.misuse; }
+  function premiseOf(p){ const e=pEN(p); return lang==="en" ? (e.premise||p.premise) : p.premise; }
+  function failureOf(p){ const e=pEN(p); return lang==="en" ? (e.failure||p.failure) : p.failure; }
+  function promptOf(p){ const e=pEN(p); return lang==="en" ? (e.prompt||p.prompt) : p.prompt; }
+  function categoryOf(cat){ return lang==="en" ? (categoryEN[cat]||cat) : cat; }
+  function escapeHtml(s=""){ return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
+
+  function currentPath(){ return (location.hash.replace(/^#/,"") || "/").split("?")[0]; }
+  function queryFromHash(){
+    const raw=location.hash.replace(/^#/,"");
+    const i=raw.indexOf("?");
+    return new URLSearchParams(i>=0?raw.slice(i+1):"");
+  }
+  function route(path, params={}){
+    const qs=new URLSearchParams(params).toString();
+    location.hash = path + (qs?`?${qs}`:"");
+  }
+  function nav(){
+    const path=currentPath();
+    const items=[["#/","home"],["#/principles","principles"],["#/decisions","decisions"],["#/relations","relations"]];
+    $("#mainNav").innerHTML=items.map((x,i)=>{
+      const active=x[1]==="home"?path==="/":path.startsWith("/"+x[1]);
+      return `<a class="nav-link ${active?"active":""}" href="${x[0]}">${L().nav[i]}</a>`;
     }).join("");
-    return `<article class="decision-card">
-      <div><div class="decision-label">${t.problemLabel}</div><div class="decision-problem">${view.problem}</div></div>
-      <div><div class="decision-label">${t.questionLabel}</div><div class="decision-question">${view.question}</div></div>
-      <div><div class="decision-label">${t.principlesLabel}</div><div class="principle-links">${principleButtons}</div></div>
-      <div><div class="decision-label">${t.actionsLabel}</div><ul class="action-list">${view.actions.map(x=>`<li>${x}</li>`).join("")}</ul></div>
-      <button class="decision-cta" data-decision="${i}">${t.viewPrinciples}</button>
+    $("#langToggle").textContent=lang==="zh"?"EN":"中文";
+    document.documentElement.dataset.theme=theme;
+    document.documentElement.lang=lang==="en"?"en":"zh-CN";
+  }
+
+  function principleMatches(p,q){
+    if(!q) return true;
+    const e=pEN(p);
+    return [p.name,p.en,p.category,p.core,p.map,p.misuse,p.premise,p.failure,...(p.use||[]),e.name,e.core,e.map,e.misuse,e.premise,e.failure,...(e.use||[])]
+      .filter(Boolean).join(" ").toLowerCase().includes(q.toLowerCase());
+  }
+  function recentPrinciples(){ return recent.map(id=>principles.find(p=>p.id===id)).filter(Boolean).slice(0,6); }
+  function saveRecent(id){ recent=[id,...recent.filter(x=>x!==id)].slice(0,10); storage.set("principle-recent",recent); }
+  function favoritePrinciples(){ return principles.filter(p=>favs.has(p.id)).slice(0,6); }
+
+  function miniPrinciple(p){
+    return `<a class="mini-principle" href="#/principles/${p.id}">
+      <div class="en">${escapeHtml(subNameOf(p))}</div><strong>${escapeHtml(nameOf(p))}</strong><p>${escapeHtml(coreOf(p))}</p>
+    </a>`;
+  }
+
+  function renderHome(){
+    const scenarios=scenarioData.slice(0,12);
+    const scenarioViews=lang==="en"?scenarioEN:scenarioData;
+    $("#app").innerHTML=`
+      <section class="hero">
+        <div>
+          <div class="page-kicker">${L().homeKicker}</div>
+          <h1>${L().homeTitle}</h1>
+          <p class="hero-copy">${L().homeCopy}</p>
+          <div class="search-box">
+            <input id="homeSearch" placeholder="${L().search}" />
+            <div class="search-hint">${L().searchHint}</div>
+          </div>
+        </div>
+        <aside class="hero-aside"><strong>${L().homeAsideTitle}</strong><p>${L().homeAside}</p></aside>
+      </section>
+      <section class="entry-grid">
+        ${["principles","decisions","relations"].map((r,i)=>`<a class="entry-card" href="#/${r}">
+          <span class="num">0${i+1}</span><h3>${L().entries[i]}</h3><p>${L().entryDesc[i]}</p>
+        </a>`).join("")}
+      </section>
+      <section class="stats">
+        <div class="stat-card"><b>${principles.length}</b><span>${lang==="en"?"Principles":"思想原则"}</span></div>
+        <div class="stat-card"><b>${decisionData.length}</b><span>${lang==="en"?"Decision cards":"工程决策卡"}</span></div>
+        <div class="stat-card"><b>${new Set(principles.map(p=>p.category)).size}</b><span>${lang==="en"?"Categories":"知识类别"}</span></div>
+        <div class="stat-card"><b>${principles.filter(p=>p.combine?.length).length}</b><span>${lang==="en"?"Related principles":"已建立关系"}</span></div>
+      </section>
+      <section class="section">
+        <div class="section-head"><div><h2 class="section-title">${L().common}</h2></div><a class="text-link" href="#/decisions">${L().viewAll}</a></div>
+        <div class="scenario-grid">${scenarios.map((s,i)=>{
+          const v=scenarioViews[i]||s;
+          return `<article class="scenario-card" data-scenario="${i}"><strong>${escapeHtml(v[0])}</strong><span>${escapeHtml(v[1])}</span></article>`;
+        }).join("")}</div>
+      </section>
+      <section class="section">
+        <div class="section-head"><div><h2 class="section-title">${L().recent}</h2></div><a class="text-link" href="#/principles">${L().viewAll}</a></div>
+        <div class="mini-grid">${recentPrinciples().length?recentPrinciples().map(miniPrinciple).join(""):`<div class="empty">${L().noRecent}</div>`}</div>
+      </section>
+      <section class="section">
+        <div class="section-head"><div><h2 class="section-title">${L().favorites}</h2></div><a class="text-link" href="#/principles">${L().viewAll}</a></div>
+        <div class="mini-grid">${favoritePrinciples().length?favoritePrinciples().map(miniPrinciple).join(""):`<div class="empty">${L().noFav}</div>`}</div>
+      </section>
+      <div class="footer-note">${L().footer}</div>`;
+    $("#homeSearch").addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.value.trim())route("/principles",{q:e.target.value.trim()});});
+    $$(".scenario-card").forEach(el=>el.onclick=()=>{ const s=scenarioData[+el.dataset.scenario]; route("/principles",{ids:s[2].join(",")}); });
+  }
+
+  function principleRow(p){
+    return `<article class="principle-row">
+      <a href="#/principles/${p.id}"><div class="en">${escapeHtml(subNameOf(p))}</div><h3>${escapeHtml(nameOf(p))}</h3></a>
+      <a href="#/principles/${p.id}"><p>${escapeHtml(mapOf(p))}</p></a>
+      <div class="row-tags">
+        <span class="tag">${escapeHtml(categoryOf(p.category))}</span>
+        ${(p.layers||[]).slice(0,3).map(x=>`<span class="tag">${x}</span>`).join("")}
+        <button class="star ${favs.has(p.id)?"on":""}" data-fav="${p.id}" title="${lang==="en"?"Favorite":"收藏"}">${favs.has(p.id)?"★":"☆"}</button>
+      </div>
     </article>`;
-  }).join("");
+  }
 
-  document.querySelectorAll("[data-principle]").forEach(btn=>{btn.onclick=()=>openDetail(btn.dataset.principle);});
-  document.querySelectorAll("[data-decision]").forEach(btn=>{
-    btn.onclick=()=>{
-      const d = decisionData[+btn.dataset.decision];
-      state.scenarioIds = d.principles; state.q=""; state.category="全部"; state.layer="全部";
-      $("#search").value=""; render();
-      window.scrollTo({top:document.querySelector(".meta-row").offsetTop-130,behavior:"smooth"});
-    };
-  });
-}
+  function renderPrinciples(){
+    const params=queryFromHash();
+    if(params.has("q")) filters.q=params.get("q")||"";
+    const ids=params.get("ids")?new Set(params.get("ids").split(",")):null;
+    const categories=["全部",...new Set(principles.map(p=>p.category))];
+    const layers=["全部","Prompt","Context","Tool","Harness","Loop","Eval"];
+    const data=principles.filter(p=>{
+      if(ids&&!ids.has(p.id))return false;
+      if(filters.favOnly&&!favs.has(p.id))return false;
+      if(filters.category!=="全部"&&p.category!==filters.category)return false;
+      if(filters.layer!=="全部"&&!(p.layers||[]).includes(filters.layer))return false;
+      return principleMatches(p,filters.q);
+    });
+    $("#app").innerHTML=`
+      <div class="page-head"><div><div class="page-kicker">Library</div><h1 class="page-title">${L().principlesTitle}</h1><p class="page-subtitle">${L().principlesSub}</p></div></div>
+      <div class="library-layout">
+        <aside class="filter-panel">
+          <div class="filter-group"><div class="filter-label">${lang==="en"?"Category":"类别"}</div><div class="filter-list">
+            ${categories.map(c=>`<button class="chip ${filters.category===c?"active":""}" data-cat="${escapeHtml(c)}">${c==="全部"?L().allCategories:escapeHtml(categoryOf(c))}</button>`).join("")}
+          </div></div>
+          <div class="filter-group"><div class="filter-label">${lang==="en"?"Engineering layer":"工程层"}</div><div class="filter-list">
+            ${layers.map(x=>`<button class="chip ${filters.layer===x?"active":""}" data-layer="${x}">${x==="全部"?L().allLayers:x}</button>`).join("")}
+          </div></div>
+        </aside>
+        <section>
+          <div class="library-toolbar">
+            <input class="library-search" id="librarySearch" value="${escapeHtml(filters.q)}" placeholder="${L().search}" />
+            <button class="btn ${filters.favOnly?"active":""}" id="favOnly">${L().favoritesOnly}</button>
+            <button class="btn" id="clearFilters">${L().clear}</button>
+          </div>
+          <div class="result-meta">${L().showing} ${data.length} / ${principles.length} ${L().items}</div>
+          <div class="principle-list">${data.length?data.map(principleRow).join(""):`<div class="empty">${L().empty}</div>`}</div>
+        </section>
+      </div>
+      <div class="footer-note">${L().footer}</div>`;
+    $("#librarySearch").addEventListener("input",e=>{filters.q=e.target.value;renderPrinciples();});
+    $("#favOnly").onclick=()=>{filters.favOnly=!filters.favOnly;renderPrinciples();};
+    $("#clearFilters").onclick=()=>{filters={q:"",category:"全部",layer:"全部",favOnly:false};route("/principles");renderPrinciples();};
+    $$("[data-cat]").forEach(b=>b.onclick=()=>{filters.category=b.dataset.cat;renderPrinciples();});
+    $$("[data-layer]").forEach(b=>b.onclick=()=>{filters.layer=b.dataset.layer;renderPrinciples();});
+    $$("[data-fav]").forEach(b=>b.onclick=()=>{const id=b.dataset.fav;favs.has(id)?favs.delete(id):favs.add(id);storage.set("principle-favs",[...favs]);renderPrinciples();});
+  }
 
-function render(){
-  const t = uiText[lang];
-  document.documentElement.lang = lang==="en" ? "en" : "zh-CN";
-  $("#eyebrow").textContent = t.eyebrow; $("#mainTitle").innerHTML = t.title; $("#subtitle").textContent = t.subtitle;
-  $("#heroNote").textContent = t.hero; $("#search").placeholder = t.search; $("#scenarioTitle").textContent = t.scenarioTitle;
-  $("#scenarioDesc").textContent = t.scenarioDesc; $("#decisionTitle").textContent = t.decisionTitle; $("#decisionDesc").textContent = t.decisionDesc;
-  $("#reset").textContent = t.reset; $("#themeToggle").textContent = t.theme; $("#langToggle").textContent = t.lang;
-  $("#footerText").innerHTML = t.footer; $("#favOnly").textContent=state.favOnly?t.favOn:t.fav;
-  renderScenarios(); renderDecision(); renderFilters(); renderCards();
-}
+  function decisionView(d,i){
+    const en=decisionEN[i];
+    return lang==="en"&&en?{problem:en[0],question:en[1],actions:en[2]}:{problem:d.problem,question:d.question,actions:d.actions};
+  }
+  function renderDecisions(){
+    const params=queryFromHash(); const q=params.get("q")||"";
+    const data=decisionData.map((d,i)=>({d,i,v:decisionView(d,i)})).filter(x=>{
+      if(!q)return true;
+      return [x.v.problem,x.v.question,...x.v.actions,...x.d.principles.map(id=>principles.find(p=>p.id===id)?.name||"")].join(" ").toLowerCase().includes(q.toLowerCase());
+    });
+    $("#app").innerHTML=`
+      <div class="page-head"><div><div class="page-kicker">Decision Handbook</div><h1 class="page-title">${L().decisionsTitle}</h1><p class="page-subtitle">${L().decisionsSub}</p></div></div>
+      <div class="library-toolbar"><input id="decisionSearch" class="library-search" value="${escapeHtml(q)}" placeholder="${L().decisionSearch}" /></div>
+      <div class="result-meta">${L().showing} ${data.length} / ${decisionData.length}</div>
+      <div class="decision-list">${data.length?data.map(({d,i,v})=>`
+        <article class="decision-card">
+          <div><div class="decision-label">${lang==="en"?"Engineering problem":"工程问题"}</div><div class="decision-problem">${escapeHtml(v.problem)}</div>
+            <div class="principle-pills">${d.principles.map(id=>{const p=principles.find(x=>x.id===id);return p?`<a class="principle-pill" href="#/principles/${id}">${escapeHtml(nameOf(p))}</a>`:"";}).join("")}</div>
+          </div>
+          <div><div class="decision-label">${lang==="en"?"Judgment question":"判断问题"}</div><div class="decision-question">${escapeHtml(v.question)}</div></div>
+          <div><div class="decision-label">${lang==="en"?"Executable actions":"可执行动作"}</div><ul class="action-list">${v.actions.map(a=>`<li>${escapeHtml(a)}</li>`).join("")}</ul></div>
+        </article>`).join(""):`<div class="empty">${L().empty}</div>`}</div>
+      <div class="footer-note">${L().footer}</div>`;
+    $("#decisionSearch").addEventListener("keydown",e=>{if(e.key==="Enter")route("/decisions",{q:e.target.value.trim()});});
+  }
 
-$("#search").addEventListener("input",e=>{state.q=e.target.value;state.scenarioIds=null;renderCards()});
-$("#favOnly").onclick=()=>{state.favOnly=!state.favOnly;render()};
-$("#reset").onclick=()=>{state={category:"全部",layer:"全部",q:"",favOnly:false,scenarioIds:null};$("#search").value="";render();};
-$("#dialog").addEventListener("click",e=>{ if(e.target===$("#dialog")) $("#dialog").close(); });
-$("#themeToggle").onclick=()=>{theme = theme==="dark" ? "light" : "dark";document.documentElement.dataset.theme = theme;localStorage.setItem("principle-theme", theme);};
-$("#langToggle").onclick=()=>{lang = lang==="zh" ? "en" : "zh";localStorage.setItem("principle-lang", lang);render();};
-render();
+  function renderRelations(){
+    const related=principles.filter(p=>p.combine?.length);
+    $("#app").innerHTML=`
+      <div class="page-head"><div><div class="page-kicker">Knowledge Relations</div><h1 class="page-title">${L().relationsTitle}</h1><p class="page-subtitle">${L().relationsSub}</p></div></div>
+      <div class="relation-grid">${related.map(p=>`
+        <article class="relation-card">
+          <div class="en">${escapeHtml(subNameOf(p))}</div><h3><a href="#/principles/${p.id}">${escapeHtml(nameOf(p))}</a></h3>
+          <p>${escapeHtml(failureOf(p)||mapOf(p))}</p>
+          <div class="relation-line"><span class="relation-arrow">${L().related} →</span>
+            ${(p.combine||[]).map(id=>{const r=principles.find(x=>x.id===id);return r?`<a class="principle-pill" href="#/principles/${r.id}">${escapeHtml(nameOf(r))}</a>`:"";}).join("")}
+          </div>
+        </article>`).join("")}</div>
+      <div class="footer-note">${L().footer}</div>`;
+  }
+
+  function renderDetail(id){
+    const p=principles.find(x=>x.id===id);
+    if(!p){$("#app").innerHTML=`<div class="empty">${L().empty}</div>`;return;}
+    saveRecent(id);
+    const related=(p.combine||[]).map(rid=>principles.find(x=>x.id===rid)).filter(Boolean);
+    const relatedDecisions=decisionData.map((d,i)=>({d,i,v:decisionView(d,i)})).filter(x=>x.d.principles.includes(id)).slice(0,6);
+    $("#app").innerHTML=`
+      <div class="detail-shell">
+        <a class="back-link" href="#/principles">${L().back}</a>
+        <section class="detail-hero">
+          <div class="en">${escapeHtml(subNameOf(p))}</div><h1>${escapeHtml(nameOf(p))}</h1>
+          <div class="detail-quote">${escapeHtml(coreOf(p))}</div><p class="detail-map">${escapeHtml(mapOf(p))}</p>
+          <div class="principle-pills"><span class="tag">${escapeHtml(categoryOf(p.category))}</span>${(p.layers||[]).map(x=>`<span class="tag">${x}</span>`).join("")}<button class="star ${favs.has(id)?"on":""}" id="detailFav">${favs.has(id)?"★":"☆"}</button></div>
+        </section>
+        <section class="detail-grid">
+          <div class="detail-card"><h2>${L().use}</h2><ul>${useOf(p).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>
+          <div class="detail-card"><h2>${L().misuse}</h2><p>${escapeHtml(misuseOf(p))}</p></div>
+          ${premiseOf(p)?`<div class="detail-card"><h2>${L().premise}</h2><p>${escapeHtml(premiseOf(p))}</p></div>`:""}
+          ${failureOf(p)?`<div class="detail-card"><h2>${L().failure}</h2><p>${escapeHtml(failureOf(p))}</p></div>`:""}
+          ${related.length?`<div class="detail-card detail-full"><h2>${L().related}</h2><div class="principle-pills">${related.map(r=>`<a class="principle-pill" href="#/principles/${r.id}">${escapeHtml(nameOf(r))}</a>`).join("")}</div></div>`:""}
+          <div class="detail-card detail-full"><h2>${L().prompt}</h2><pre>${escapeHtml(promptOf(p))}</pre></div>
+          ${relatedDecisions.length?`<div class="detail-card detail-full"><h2>${L().relatedDecisions}</h2>${relatedDecisions.map(x=>`<a class="text-link" style="display:block;margin:7px 0" href="#/decisions?q=${encodeURIComponent(x.v.problem)}">→ ${escapeHtml(x.v.problem)}</a>`).join("")}</div>`:""}
+        </section>
+        <div class="footer-note">${L().footer}</div>
+      </div>`;
+    $("#detailFav").onclick=()=>{favs.has(id)?favs.delete(id):favs.add(id);storage.set("principle-favs",[...favs]);renderDetail(id);};
+  }
+
+  function render(){
+    nav();
+    const path=currentPath();
+    window.scrollTo(0,0);
+    if(path==="/") return renderHome();
+    if(path==="/principles") return renderPrinciples();
+    if(path.startsWith("/principles/")) return renderDetail(decodeURIComponent(path.split("/")[2]||""));
+    if(path==="/decisions") return renderDecisions();
+    if(path==="/relations") return renderRelations();
+    route("/");
+  }
+
+  function init(){
+    $("#themeToggle").onclick=()=>{theme=theme==="dark"?"light":"dark";localStorage.setItem("principle-theme",theme);document.documentElement.dataset.theme=theme;};
+    $("#langToggle").onclick=()=>{lang=lang==="zh"?"en":"zh";localStorage.setItem("principle-lang",lang);render();};
+    addEventListener("hashchange",render);
+    render();
+  }
+  return {init};
+})();
+App.init();
